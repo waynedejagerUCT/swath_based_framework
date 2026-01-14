@@ -1,4 +1,5 @@
-# %%
+
+#%%
 '''
 Author:
     Wayne de Jager
@@ -29,109 +30,87 @@ Machine:
     - conda env00...
 '''
 
-# %%
-def get_mask(hemisphere):
-    print('[f] get_mask(...)')
-    if hemisphere[0:1] == 'n':
-        fmask = dir_mask + 'amsr_gsfc_12n.hdf'
-        # 1 for land, 0 for water
-    elif hemisphere[0:1] == 's':
-        fmask = dir_mask + 'amsr_nic_12s.hdf'
-        # 1 for land, 0 for water, 2 for coastal zone
-    else:
-        print('ERROR: Unknown hemisphere parameter. Use "n" or "s" for northern or southern hemisphere respectively.')
-    
-    dmask = gdal.Open(fmask, gdal.GA_ReadOnly)
-    mask  = dmask.ReadAsArray()
-
-# %%
 def get_grids(hemisphere, grid_proj, grid_res):
-    '''
-    Purpose:
-        Generates polar stereographic grid in NSIDC or EASE projection
-    Details:
-        NSIDC:
-            - NSIDC Sea Ice Polar Stereographic North (EPSG:3411): https://epsg.io/3411
-            - NSIDC Sea Ice Polar Stereographic South (EPSG:3412): https://epsg.io/3412
-            - WGS 84 / NSIDC EASE-Grid 2.0 North (EPSG:6931): https://epsg.io/6931
-            - WGS 84 / NSIDC EASE-Grid 2.0 South (EPSG:6932): https://epsg.io/6932
+    """
+    Generate a regular polar grid (NSIDC or EASE-Grid 2.0).
 
+    Parameters
+    ----------
+    hemisphere : {'north', 'south'}
+    grid_proj  : {'nsidc', 'ease'}
+    grid_res   : float
+        Grid resolution in km.
 
-        if coordinates string given as 'latlon', returns latitude, longitude in degrees
-        if coordinates string given as 'xy', returns x-coord, y-coord in meters
-    '''
-    print('[f] get_grids(...)')
+    Returns
+    -------
+    lat, lon : 2D arrays
+        Latitude and longitude (degrees).
+    x, y : 2D arrays
+        Projected x/y coordinates (meters).
+    """
 
-    resolution = grid_res*1000
-    proj_id    = grid_proj+'_'+hemisphere[0:1]+'h'
+    resolution = grid_res * 1000.0
 
-    if proj_id == 'nsidc_nh':
-        area_id      = proj_id
-        discription  = 'NSIDC Sea Ice Polar Stereographic North (EPSG:3411)'
-        epsg_code    = 'EPSG:3411'
-        proj4_string = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +a=6378273 +b=6356889.449 +units=m +no_defs'
-        ar           = [i*1000 for i in [-3850,-5350,3750,5850]]
-    elif proj_id == 'nsidc_sh':
-        area_id      = proj_id
-        discription  = 'NSIDC Sea Ice Polar Stereographic South (EPSG:3412)'
-        epsg_code    = 'EPSG:3412'
-        proj4_string = '+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378273 +b=6356889.449 +units=m +no_defs'
-        ar           = [i*1000 for i in [-3950,-3950,3950,4350]]
-    elif proj_id == 'ease_nh':
-        area_id      = proj_id
-        discription  = 'WGS 84 / NSIDC EASE-Grid 2.0 North (EPSG:6931)'
-        epsg_code    = 'EPSG:6931'
-        proj4_string = '+proj=laea +lat_0=90 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
-        ar           = [i*1000 for i in [-3850,-5350,3750,5850]]
-    elif proj_id == 'ease_sh':
-        area_id      = proj_id
-        discription  = 'WGS 84 / NSIDC EASE-Grid 2.0 South (EPSG:6932)'
-        epsg_code    = 'EPSG:6932'
-        proj4_string = '+proj=laea +lat_0=-90 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
-        ar           = [i*1000 for i in [-3950,-3950,3950,4350]]
+    hemisphere = hemisphere.lower()
+    grid_proj  = grid_proj.lower()
+
+    if grid_proj == 'nsidc':
+        epsg = 3411 if hemisphere == 'north' else 3412
+    elif grid_proj == 'ease':
+        epsg = 6931 if hemisphere == 'north' else 6932
     else:
-        print('ERROR: could not identify grid projection. Please use "nsidc" or "ease" arguments.')
+        raise ValueError('grid_proj must be "nsidc" or "ease"')
 
+    crs = CRS.from_epsg(epsg)
 
-    grid_size  = lambda res:[int(a/res) for a in [(ar[2]-ar[0]),(ar[3]-ar[1])]]
-    xdim, ydim = grid_size(resolution)
+    # ---- Recommended: use standard NSIDC extents ----
+    # Example for EASE-Grid 2.0 SH; adjust if needed
+    if epsg in (6931, 6932):
+        half_width = 720 * resolution / 2.0
+        area_extent = (-half_width, -half_width,
+                         half_width,  half_width)
+        xdim = ydim = 720
+    else:
+        # legacy NSIDC stereographic – use documented extents
+        half_width = 3950e3
+        area_extent = (-half_width, -half_width,
+                         half_width,  half_width)
+        xdim = int(round((area_extent[2]-area_extent[0]) / resolution))
+        ydim = int(round((area_extent[3]-area_extent[1]) / resolution))
+    
+    proj_str = crs.to_proj4()
 
-    area_def   = AreaDefinition(area_id, discription, proj_id, proj4_string, xdim, ydim, ar)
-    lon, lat   = area_def.get_lonlats()
-    x_grid     = (np.arange(ar[0]+resolution/2.,ar[2],resolution))
-    y_grid     = (np.arange(ar[1]+resolution/2.,ar[3],resolution))
-    xc, yc     = np.meshgrid(x_grid,y_grid)
+    
+    area_def = AreaDefinition(f'{grid_proj}_{hemisphere}',crs.name,crs.srs,proj_str,xdim,ydim,area_extent)
 
-    return lat, lon, xc, yc
+    lon, lat = area_def.get_lonlats()
+    x, y     = area_def.get_proj_coords()
 
-# %%
-def swath_remapping(in_lat, in_lon, in_data, hemisphere, grid_proj, grid_res, sample_radius):
+    return lat, lon, x, y
+
+def swath_remapping(in_lat, in_lon, in_data, out_grid, sample_radius):
     print('[f] swath_remapping(...)')
 
     sample_radius = sample_radius*1000 #units km to meters
 
     # input grid: input swath data
     in_grid  = pr.geometry.SwathDefinition(lons=pr.utils.wrap_longitudes(in_lon), lats=in_lat)
-    # output grid: generate custom grid on which swath data will be remapped
-    out_lat, out_lon, out_xc, out_yc = get_grids(hemisphere, grid_proj, grid_res)
-    out_grid = pr.geometry.SwathDefinition(lons=out_lon, lats=out_lat)
-
     # remap input_grid onto output_grid
     grdata   = pr.kd_tree.resample_nearest(in_grid, in_data, out_grid, radius_of_influence=sample_radius, fill_value=np.nan)
 
     return out_lat, out_lon, out_xc, out_yc, grdata
 
-# %%
+
 if __name__ == '__main__':
     import numpy as np
     import h5py
     import timeit
     import pyresample as pr
-    import datetime
     import os
-    from pyresample import get_area_def
     from pyresample.geometry import AreaDefinition
-    #from osgeo import gdal
+    from pyresample.geometry import GridDefinition
+    from pyresample.geometry import AreaDefinition
+    from pyproj import CRS
 
     timeit_t0 = timeit.default_timer()
 
@@ -149,6 +128,10 @@ if __name__ == '__main__':
     list_of_files = os.listdir(dir_amsr2)
     list_of_files = ['GW1AM2_201907261709_107A_L1SGBTBR_2220220.h5']
 
+    # create output grid: generate custom grid on which swath data will be remapped
+    out_lat, out_lon, out_xc, out_yc = get_grids(hemisphere, grid_proj, grid_res)
+    out_grid                         = GridDefinition(lons=out_lon, lats=out_lat)
+
     for file in list_of_files:
         print('Filename: ' + file)
 
@@ -163,15 +146,15 @@ if __name__ == '__main__':
         # generate latlon grid compatible with low frequency channels by modifying available 89GHz grid
         lat_a    = H['Latitude of Observation Point for 89A'][:]
         in_lat   = lat_a[:,1::2]
-        lon_a    = H['Longitude of Observation Point for 89B'][:]
+        lon_a    = H['Longitude of Observation Point for 89A'][:]
         in_lon   = lon_a[:,1::2]
         # remap swath brightness temperatures onto custom grid
-        out_lat, out_lon, out_xc, out_yc, TB_19_H = swath_remapping(in_lat, in_lon, tb_19_h, hemisphere, grid_proj, grid_res, sample_radius)
-        out_lat, out_lon, out_xc, out_yc, TB_19_V = swath_remapping(in_lat, in_lon, tb_19_v, hemisphere, grid_proj, grid_res, sample_radius)
-        out_lat, out_lon, out_xc, out_yc, TB_22_H = swath_remapping(in_lat, in_lon, tb_22_h, hemisphere, grid_proj, grid_res, sample_radius)
-        out_lat, out_lon, out_xc, out_yc, TB_22_V = swath_remapping(in_lat, in_lon, tb_22_v, hemisphere, grid_proj, grid_res, sample_radius)
-        out_lat, out_lon, out_xc, out_yc, TB_37_H = swath_remapping(in_lat, in_lon, tb_37_h, hemisphere, grid_proj, grid_res, sample_radius)
-        out_lat, out_lon, out_xc, out_yc, TB_37_V = swath_remapping(in_lat, in_lon, tb_37_v, hemisphere, grid_proj, grid_res, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_19_H = swath_remapping(in_lat, in_lon, tb_19_h, out_grid, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_19_V = swath_remapping(in_lat, in_lon, tb_19_v, out_grid, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_22_H = swath_remapping(in_lat, in_lon, tb_22_h, out_grid, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_22_V = swath_remapping(in_lat, in_lon, tb_22_v, out_grid, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_37_H = swath_remapping(in_lat, in_lon, tb_37_h, out_grid, sample_radius)
+        out_lat, out_lon, out_xc, out_yc, TB_37_V = swath_remapping(in_lat, in_lon, tb_37_v, out_grid, sample_radius)
         # generate indexing for ECICE
         grid_shape   = TB_19_H.shape
         grid_size    = grid_shape[0]*grid_shape[1]
@@ -235,6 +218,56 @@ if __name__ == '__main__':
     timeit_t1 = timeit.default_timer()
 
     print('[dt] Processing time: ' + str(np.round((timeit_t1-timeit_t0),3))+ 's')
+
+
+# %%
+
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import numpy as np
+
+# Assume these are defined:
+# in_lon, in_lat, tb_19_h  : swath data
+# out_lon, out_lat, TB_19_H : gridded data
+
+# Define Weddell Sea extent: lon_min, lon_max, lat_min, lat_max
+# Approximate bounds: 280–350°E, -80 to -60°S
+extent = [310, 340, -60, -70]
+
+# Create South Polar Stereographic projection
+proj = ccrs.SouthPolarStereo(true_scale_latitude=-71)  # typical NSIDC
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 7),
+                         subplot_kw={'projection': proj},
+                         constrained_layout=True)
+
+# Determine common color scale
+vmin = np.nanmin([np.nanmin(tb_19_h), np.nanmin(TB_19_H)])
+vmax = np.nanmax([np.nanmax(tb_19_h), np.nanmax(TB_19_H)])
+
+# --- Left: input swath ---
+sc1 = axes[0].scatter(in_lon.flatten(), in_lat.flatten(),
+                      c=tb_19_h.flatten(),
+                      s=5, cmap='jet', vmin=vmin, vmax=vmax,
+                      transform=ccrs.PlateCarree())
+axes[0].coastlines(resolution='50m')
+axes[0].add_feature(cfeature.LAND, facecolor='lightgray')
+axes[0].set_extent(extent, crs=ccrs.PlateCarree())
+axes[0].set_title('Input Swath (tb_19_h)')
+plt.colorbar(sc1, ax=axes[0], orientation='vertical', label='TB [K]')
+
+# --- Right: gridded data ---
+im = axes[1].pcolormesh(out_lon, out_lat, TB_19_H,
+                        cmap='jet', vmin=vmin, vmax=vmax,
+                        shading='auto', transform=ccrs.PlateCarree())
+axes[1].coastlines(resolution='50m')
+axes[1].add_feature(cfeature.LAND, facecolor='lightgray')
+axes[1].set_extent(extent, crs=ccrs.PlateCarree())
+axes[1].set_title('Output Grid (TB_19_H)')
+plt.colorbar(im, ax=axes[1], orientation='vertical', label='TB [K]')
+
+plt.show()
 
 
 # %%
