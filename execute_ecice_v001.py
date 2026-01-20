@@ -17,7 +17,7 @@ if __name__ == '__main__':
     6. Input prompts:
     	Apply SEALION Weather Correction? (y/n)
 	    Apply Open Water Filter? (y/n)
-	    Substitute low 85 or 89 GHz data with 37 GHz data? (y/n): n
+	    Substitute low 85 or 89 GHz data with 37 GHz data? (y/n)
 	    Apply Cloud Filter? (y/n)
     '''
    
