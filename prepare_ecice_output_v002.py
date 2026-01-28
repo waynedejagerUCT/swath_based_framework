@@ -78,7 +78,7 @@ if __name__ == '__main__':
     COL = dict(ORLINE=0,ORCELL=1,LAT=2,LON=3,BKAS=4,BRT19H=5,BRT19V=6,BRT22H=7,BRT22V=8,
                BRT37H=9,BRT37V=10,PR19=11,PR22=12,PR37=13,GD37v19v=14,GR22v19v=15,LAND=16,
                C_OW=17,C_FYI=18,C_YI=19,C_MYI=20,C_TOT=21,CONF_OW=22,CONF_I1=23,
-               CONF_I2=24,CONF_I3=25,CONF_VEC=2)
+               CONF_I2=24,CONF_I3=25,CONF_VEC=26)
     
     for file in list_of_files:
         if '-ECICE' not in file:
