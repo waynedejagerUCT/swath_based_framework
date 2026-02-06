@@ -25,12 +25,18 @@ def scatter_to_grid(orline_1d, orcell_1d, values_1d, fill=np.nan, dtype=float):
     grid[orline, orcell] = values_1d.astype(dtype)
     return grid
 
-def get_grids(grid_res):
+def get_grids(grid_res, grid_proj):
     import xarray as xr
     import numpy as np
     from pyresample.geometry import GridDefinition
 
-    fname = f"/home/waynedj/Data/grids/ease2/NSIDC0772_LatLon_EASE2_S{grid_res}km_v1.1.nc"
+    if grid_proj == 'EASE2':
+        fname = f"/home/waynedj/Data/grids/NSIDC0772_LatLon_EASE2_S{grid_res}km_v1.1.nc"
+    elif grid_proj == 'PS':
+        fname = f"/home/waynedj/Data/grids/NSIDC0771_LatLon_PS_S{grid_res}km_v1.1.nc"
+    else:
+        raise ValueError("Unsupported grid projection. Must be 'EASE2' or 'PS'.")
+
     ds = xr.open_dataset(fname)
 
     lat = np.nan_to_num(ds.latitude.data)
@@ -58,17 +64,18 @@ if __name__ == '__main__':
     timeit_t0 = timeit.default_timer()
 
     #parameters and directories
-    grid_res         = 25
+    grid_res         = 12.5
+    grid_proj       = 'PS'
     sample_radius    = grid_res*1.5
 
-    dir_input        = '/home/waynedj/Data/intermediate/ecice/'
-    dir_output       = '/home/waynedj/Data/intermediate/ecice/netcdf/'
+    dir_input        = '/home/waynedj/Data/intermediate/ecice/scale2022/'
+    dir_output       = '/home/waynedj/Data/intermediate/ecice/scale2022/netcdf/'
 
     list_of_files = os.listdir(dir_input)
-    list_of_files = ['GW1AM2_201907261709_107A_L1SGRTBR_2220220-intermediate-v001-ECICE.txt', 'GW1AM2_201907270213_203D_L1SGRTBR_2220220-intermediate-v001-ECICE.txt']
+    #list_of_files = ['GW1AM2_201907261709_107A_L1SGRTBR_2220220-intermediate-v001-ECICE.txt', 'GW1AM2_201907270213_203D_L1SGRTBR_2220220-intermediate-v001-ECICE.txt']
 
     # fetch grid latlon and xy coordinates
-    out_grid, lats, lons, xc, yc = get_grids(grid_res)
+    out_grid, lats, lons, xc, yc = get_grids(grid_res, grid_proj)
     xc, yc                       = np.meshgrid(xc, yc)
     grid_shape                   = lats.shape
     # give xc and yc variables a time dimension for dataset dim compatibility
@@ -83,8 +90,8 @@ if __name__ == '__main__':
     for file in list_of_files:
         if '-ECICE' not in file:
             continue
-        
-        print('Mapping ' + file + ' from txt to EASE2 grid in netcdf format.')
+
+        print('Mapping ' + file + f' from txt to {grid_proj} at {grid_res}km grid in netcdf format.')
         # fetch data from intermediate .txt file
         data       = np.genfromtxt(os.path.join(dir_input, file), skip_header=1)
         # Unpack 1D columns
@@ -181,11 +188,11 @@ if __name__ == '__main__':
                 time=t
             ),
             attrs=dict(
-                Title='ECICE applied to AMSR-2 swaths',
-                Description='ECICE outputs reconstructed on native ORLINE/ORCELL swath grid, then resampled to EASE2.',
+                Title='ECICE applied to AMSR-2 swaths. Native L1R swath data at 23km spatial resolution.',
+                Description=f'ECICE outputs reconstructed on native ORLINE/ORCELL swath grid, then resampled to {grid_proj}.',
                 Hemisphere='Southern Hemisphere',
                 Grid_resolution=str(grid_res) + ' km',
-                Grid_projection='EASE2',
+                Grid_projection=grid_proj,
                 Author='Wayne de Jager, Department of Oceanography, University of Cape Town, South Africa',
                 DistVersion='v0.0.2'
             )

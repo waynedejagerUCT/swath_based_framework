@@ -7,20 +7,26 @@ if __name__ == '__main__':
     import timeit
     import pyresample as pr
     import os
+    import random
 
     timeit_t0 = timeit.default_timer()
 
-    dir_amsr2        = '/home/waynedj/Data/amsr2/l1r/'
-    dir_output       = '/home/waynedj/Data/intermediate/ecice/'
+    dir_amsr2        = '/home/waynedj/Data/amsr2/l1r/CaseStudy2019/'
+    dir_output       = '/home/waynedj/Data/intermediate/ecice/CaseStudy2019/'
+    n_sample         = 50
+    resample_res     = 'res10'
 
     list_of_files = os.listdir(dir_amsr2)
-    list_of_files = ['GW1AM2_201907261709_107A_L1SGRTBR_2220220.h5','GW1AM2_201907270213_203D_L1SGRTBR_2220220.h5']
+    #list_of_files = ['GW1AM2_202207200118_194D_L1SGRTBR_2220220.h5']
+
+    #select a subset of n_sample files from all AMSR2 swaths between 15-31 July, 2019, to reduce resource requirements 
+    if len(list_of_files) > n_sample:
+        list_of_files = random.sample(list_of_files, n_sample)
 
     for file in list_of_files:
         print('Preparing swath filename: ' + file)
         with h5py.File(dir_amsr2 + file, mode='r') as H:
             # fetch brightness temperatures from low frequency channels
-            resample_res = 'res23'
             tb_19_h  = H[f'Brightness Temperature ({resample_res},18.7GHz,H)'][:]/100
             tb_19_v  = H[f'Brightness Temperature ({resample_res},18.7GHz,V)'][:]/100
             tb_22_h  = H[f'Brightness Temperature ({resample_res},23.8GHz,H)'][:]/100
@@ -32,7 +38,6 @@ if __name__ == '__main__':
             lat   = lat_a[:,1::2]
             lon_a = H['Longitude of Observation Point for 89A'][:]
             lon   = lon_a[:,1::2]
-
             # generate indexing for ECICE
             grid_shape   = tb_19_h.shape
             grid_size    = grid_shape[0]*grid_shape[1]
