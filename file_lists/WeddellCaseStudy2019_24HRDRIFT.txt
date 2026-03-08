@@ -1,0 +1,7 @@
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907251200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907261200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907271200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907281200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907291200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907301200.nc
+/home/waynedj/Data/seaicedrift/osisaf/24hr/south/merged/2019/07/ice_drift_sh_ease2-750_cdr-v1p0_24h-201907311200.nc

@@ -1,0 +1,10 @@
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/26/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190726034437w_20190726165739w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/27/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190726165739w_20190727025045w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/27/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190727025045w_20190727174215w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/28/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190727174215w_20190728033238w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/28/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190728033238w_20190728164441w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/29/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190728164441w_20190729023839w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/29/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190729023839w_20190729172935w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/30/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190729172935w_20190730032043w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/30/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190730032043w_20190730163137w.nc
+/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/31/icedrift_amsr2-gw1_tb37v-LapAtb37h-Lap_simplex_lev2_sh625_20190730163137w_20190731022633w.nc
