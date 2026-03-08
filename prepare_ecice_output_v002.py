@@ -58,29 +58,32 @@ def swath_remapping(in_lat, in_lon, in_data, out_grid, sample_radius):
     
     return grdata
 
-
 if __name__ == '__main__':
 
     timeit_t0 = timeit.default_timer()
 
     #parameters and directories
+    resample_to_grid = False  # Set False to keep native swath (ORLINE/ORCELL) grid
     grid_res         = 12.5
-    grid_proj       = 'PS'
+    grid_proj        = 'PS'
     sample_radius    = grid_res*1.5
+    level            = 'L1R'
+    resample_res     = 'res10'
 
-    dir_input        = '/home/waynedj/Data/intermediate/ecice/scale2022/'
-    dir_output       = '/home/waynedj/Data/intermediate/ecice/scale2022/netcdf/'
+    dir_input        = f'/home/waynedj/Data/intermediate/ecice/CaseStudy2019/{level}/{resample_res}'
+    dir_output       = f'/home/waynedj/Data/intermediate/ecice/CaseStudy2019/{level}/{resample_res}/netcdf/'
 
     list_of_files = os.listdir(dir_input)
     #list_of_files = ['GW1AM2_201907261709_107A_L1SGRTBR_2220220-intermediate-v001-ECICE.txt', 'GW1AM2_201907270213_203D_L1SGRTBR_2220220-intermediate-v001-ECICE.txt']
 
-    # fetch grid latlon and xy coordinates
-    out_grid, lats, lons, xc, yc = get_grids(grid_res, grid_proj)
-    xc, yc                       = np.meshgrid(xc, yc)
-    grid_shape                   = lats.shape
-    # give xc and yc variables a time dimension for dataset dim compatibility
-    xc  = xc[np.newaxis,:,:]
-    yc  = yc[np.newaxis,:,:]
+    if resample_to_grid:
+        # fetch grid latlon and xy coordinates
+        out_grid, lats, lons, xc, yc = get_grids(grid_res, grid_proj)
+        xc, yc                       = np.meshgrid(xc, yc)
+        grid_shape                   = lats.shape
+        # give xc and yc variables a time dimension for dataset dim compatibility
+        xc  = xc[np.newaxis,:,:]
+        yc  = yc[np.newaxis,:,:]
 
     COL = dict(ORLINE=0,ORCELL=1,LAT=2,LON=3,BKAS=4,BRT19H=5,BRT19V=6,BRT22H=7,BRT22V=8,
                BRT37H=9,BRT37V=10,PR19=11,PR22=12,PR37=13,GD37v19v=14,GR22v19v=15,LAND=16,
@@ -90,8 +93,10 @@ if __name__ == '__main__':
     for file in list_of_files:
         if '-ECICE' not in file:
             continue
-
-        print('Mapping ' + file + f' from txt to {grid_proj} at {grid_res}km grid in netcdf format.')
+        if resample_to_grid:
+            print('Mapping ' + file + f' from txt to {grid_proj} at {grid_res}km grid in netcdf format.')
+        else:
+            print('Mapping ' + file + ' from txt to native swath grid in netcdf format.')
         # fetch data from intermediate .txt file
         data       = np.genfromtxt(os.path.join(dir_input, file), skip_header=1)
         # Unpack 1D columns
@@ -138,21 +143,24 @@ if __name__ == '__main__':
         CONF_OW[ind1]  = np.nan
         CONF_VEC[ind1] = np.nan
         
-        # Resample swath -> EASE2 grid
-        OW_g       = swath_remapping(swath_lat, swath_lon, OW,       out_grid, sample_radius)
-        FYI_g      = swath_remapping(swath_lat, swath_lon, FYI,      out_grid, sample_radius)
-        YI_g       = swath_remapping(swath_lat, swath_lon, YI,       out_grid, sample_radius)
-        MYI_g      = swath_remapping(swath_lat, swath_lon, MYI,      out_grid, sample_radius)
-        TI_g       = swath_remapping(swath_lat, swath_lon, TI,       out_grid, sample_radius)
-        CONF_I1_g  = swath_remapping(swath_lat, swath_lon, CONF_I1,  out_grid, sample_radius)
-        CONF_I2_g  = swath_remapping(swath_lat, swath_lon, CONF_I2,  out_grid, sample_radius)
-        CONF_I3_g  = swath_remapping(swath_lat, swath_lon, CONF_I3,  out_grid, sample_radius)
-        CONF_OW_g  = swath_remapping(swath_lat, swath_lon, CONF_OW,  out_grid, sample_radius)
-        CONF_VEC_g = swath_remapping(swath_lat, swath_lon, CONF_VEC, out_grid, sample_radius)
+        if resample_to_grid:
+            # Resample swath -> EASE2 grid
+            OW_g       = swath_remapping(swath_lat, swath_lon, OW,       out_grid, sample_radius)
+            FYI_g      = swath_remapping(swath_lat, swath_lon, FYI,      out_grid, sample_radius)
+            YI_g       = swath_remapping(swath_lat, swath_lon, YI,       out_grid, sample_radius)
+            MYI_g      = swath_remapping(swath_lat, swath_lon, MYI,      out_grid, sample_radius)
+            TI_g       = swath_remapping(swath_lat, swath_lon, TI,       out_grid, sample_radius)
+            CONF_I1_g  = swath_remapping(swath_lat, swath_lon, CONF_I1,  out_grid, sample_radius)
+            CONF_I2_g  = swath_remapping(swath_lat, swath_lon, CONF_I2,  out_grid, sample_radius)
+            CONF_I3_g  = swath_remapping(swath_lat, swath_lon, CONF_I3,  out_grid, sample_radius)
+            CONF_OW_g  = swath_remapping(swath_lat, swath_lon, CONF_OW,  out_grid, sample_radius)
+            CONF_VEC_g = swath_remapping(swath_lat, swath_lon, CONF_VEC, out_grid, sample_radius)
+            LAND_g     = swath_remapping(swath_lat, swath_lon, LAND, out_grid, sample_radius)
+        else:
+            OW_g, FYI_g, YI_g, MYI_g, TI_g  = OW, FYI, YI, MYI, TI
+            CONF_I1_g, CONF_I2_g, CONF_I3_g = CONF_I1, CONF_I2, CONF_I3
+            CONF_OW_g, CONF_VEC_g, LAND_g   = CONF_OW, CONF_VEC, LAND
 
-        # LAND is categorical; nearest-neighbour is OK, but you may also keep LAND from your mask.
-        LAND_g     = swath_remapping(swath_lat, swath_lon, LAND, out_grid, sample_radius)
-                    
         # Add time dimension
         OW_g, FYI_g, YI_g, MYI_g, TI_g, CONF_I1_g, CONF_I2_g, CONF_I3_g, CONF_OW_g, CONF_VEC_g, LAND_g = [a[np.newaxis, :, :] for a in (OW_g, FYI_g, YI_g, MYI_g, TI_g, CONF_I1_g, CONF_I2_g, CONF_I3_g, CONF_OW_g, CONF_VEC_g, LAND_g)]
 
@@ -166,37 +174,71 @@ if __name__ == '__main__':
         t = np.array([datetime.datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second)])
 
         # Create Dataset
-        ds = xr.Dataset(
-            data_vars=dict(
-                xc=(['time','x','y'], xc),
-                yc=(['time','x','y'], yc),
-                OW=(['time','x','y'], OW_g),
-                YI=(['time','x','y'], YI_g),
-                FYI=(['time','x','y'], FYI_g),
-                MYI=(['time','x','y'], MYI_g),
-                TI=(['time','x','y'], TI_g),
-                CONF_I1=(['time','x','y'], CONF_I1_g),
-                CONF_I2=(['time','x','y'], CONF_I2_g),
-                CONF_I3=(['time','x','y'], CONF_I3_g),
-                CONF_OW=(['time','x','y'], CONF_OW_g),
-                CONF_VEC=(['time','x','y'], CONF_VEC_g),
-                LAND=(['time','x','y'], LAND_g),
-            ),
-            coords=dict(
-                longitude=(['x','y'], lons),
-                latitude=(['x','y'], lats),
-                time=t
-            ),
-            attrs=dict(
-                Title='ECICE applied to AMSR-2 swaths. Native L1R swath data at 23km spatial resolution.',
-                Description=f'ECICE outputs reconstructed on native ORLINE/ORCELL swath grid, then resampled to {grid_proj}.',
-                Hemisphere='Southern Hemisphere',
-                Grid_resolution=str(grid_res) + ' km',
-                Grid_projection=grid_proj,
-                Author='Wayne de Jager, Department of Oceanography, University of Cape Town, South Africa',
-                DistVersion='v0.0.2'
+        if resample_to_grid:
+            ds = xr.Dataset(
+                data_vars=dict(
+                    xc=(['time','x','y'], xc),
+                    yc=(['time','x','y'], yc),
+                    OW=(['time','x','y'], OW_g),
+                    YI=(['time','x','y'], YI_g),
+                    FYI=(['time','x','y'], FYI_g),
+                    MYI=(['time','x','y'], MYI_g),
+                    TI=(['time','x','y'], TI_g),
+                    CONF_I1=(['time','x','y'], CONF_I1_g),
+                    CONF_I2=(['time','x','y'], CONF_I2_g),
+                    CONF_I3=(['time','x','y'], CONF_I3_g),
+                    CONF_OW=(['time','x','y'], CONF_OW_g),
+                    CONF_VEC=(['time','x','y'], CONF_VEC_g),
+                    LAND=(['time','x','y'], LAND_g),
+                ),
+                coords=dict(
+                    longitude=(['x','y'], lons),
+                    latitude=(['x','y'], lats),
+                    time=t
+                ),
+                attrs=dict(
+                    Title=f'ECICE applied to AMSR2 swaths. Native L1R swath data at {resample_res} km.',
+                    Description=f'ECICE outputs reconstructed on native ORLINE/ORCELL swath grid, then resampled to {grid_proj}.',
+                    Hemisphere='Southern Hemisphere',
+                    Grid_resolution=str(grid_res) + ' km',
+                    Grid_projection=grid_proj,
+                    Author='Wayne de Jager, Department of Oceanography, University of Cape Town, South Africa',
+                    DistVersion='v0.0.2'
+                )
             )
-        )
+        else:
+            n_lines, n_cells = swath_lat.shape
+            ds = xr.Dataset(
+                data_vars=dict(
+                    OW=(['time','line','cell'], OW_g),
+                    YI=(['time','line','cell'], YI_g),
+                    FYI=(['time','line','cell'], FYI_g),
+                    MYI=(['time','line','cell'], MYI_g),
+                    TI=(['time','line','cell'], TI_g),
+                    CONF_I1=(['time','line','cell'], CONF_I1_g),
+                    CONF_I2=(['time','line','cell'], CONF_I2_g),
+                    CONF_I3=(['time','line','cell'], CONF_I3_g),
+                    CONF_OW=(['time','line','cell'], CONF_OW_g),
+                    CONF_VEC=(['time','line','cell'], CONF_VEC_g),
+                    LAND=(['time','line','cell'], LAND_g),
+                ),
+                coords=dict(
+                    longitude=(['line','cell'], swath_lon),
+                    latitude=(['line','cell'], swath_lat),
+                    line=np.arange(n_lines),
+                    cell=np.arange(n_cells),
+                    time=t
+                ),
+                attrs=dict(
+                    Title='ECICE applied to AMSR-2 swaths. Native L1B swath coordinates.',
+                    Description='ECICE outputs reconstructed on native ORLINE/ORCELL swath grid (no resampling).',
+                    Hemisphere='Southern Hemisphere',
+                    Grid_resolution='Native swath',
+                    Grid_projection='Swath',
+                    Author='Wayne de Jager, Department of Oceanography, University of Cape Town, South Africa',
+                    DistVersion='v0.0.2'
+                )
+            )
 
         # Save dataset to netcdf
         ds.to_netcdf(dir_output + file[0:41] + file[59:65] + '.nc', format='NETCDF4')

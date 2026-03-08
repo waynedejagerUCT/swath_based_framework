@@ -11,14 +11,16 @@ if __name__ == '__main__':
 
     timeit_t0 = timeit.default_timer()
 
-    dir_amsr2        = '/home/waynedj/Data/amsr2/l1r/CaseStudy2019/'
-    dir_output       = '/home/waynedj/Data/intermediate/ecice/CaseStudy2019/'
+    
     n_sample         = 50
+    level            = 'L1R'
     resample_res     = 'res10'
+    dir_amsr2        = f'/home/waynedj/Data/amsr2/l1r/CaseStudy2019/'
+    dir_output       = f'/home/waynedj/Data/intermediate/ecice/CaseStudy2019/{level}/{resample_res}/'
 
-    list_of_files = os.listdir(dir_amsr2)
-    #list_of_files = ['GW1AM2_202207200118_194D_L1SGRTBR_2220220.h5']
-
+    list_of_files    = os.listdir(dir_amsr2)
+    list_of_files    = ['GW1AM2_201907261709_107A_L1SGRTBR_2220220.h5', 'GW1AM2_201907270213_203D_L1SGRTBR_2220220.h5']
+  
     #select a subset of n_sample files from all AMSR2 swaths between 15-31 July, 2019, to reduce resource requirements 
     if len(list_of_files) > n_sample:
         list_of_files = random.sample(list_of_files, n_sample)
@@ -26,13 +28,23 @@ if __name__ == '__main__':
     for file in list_of_files:
         print('Preparing swath filename: ' + file)
         with h5py.File(dir_amsr2 + file, mode='r') as H:
-            # fetch brightness temperatures from low frequency channels
-            tb_19_h  = H[f'Brightness Temperature ({resample_res},18.7GHz,H)'][:]/100
-            tb_19_v  = H[f'Brightness Temperature ({resample_res},18.7GHz,V)'][:]/100
-            tb_22_h  = H[f'Brightness Temperature ({resample_res},23.8GHz,H)'][:]/100
-            tb_22_v  = H[f'Brightness Temperature ({resample_res},23.8GHz,V)'][:]/100
-            tb_37_h  = H[f'Brightness Temperature ({resample_res},36.5GHz,H)'][:]/100
-            tb_37_v  = H[f'Brightness Temperature ({resample_res},36.5GHz,V)'][:]/100
+            # fetch brightness temperatures from low frequency channels. Check if L1B or L1R.
+            if level == 'L1B':
+                tb_19_h  = H[f'Brightness Temperature (18.7GHz,H)'][:]/100
+                tb_19_v  = H[f'Brightness Temperature (18.7GHz,V)'][:]/100
+                tb_22_h  = H[f'Brightness Temperature (23.8GHz,H)'][:]/100
+                tb_22_v  = H[f'Brightness Temperature (23.8GHz,V)'][:]/100
+                tb_37_h  = H[f'Brightness Temperature (36.5GHz,H)'][:]/100
+                tb_37_v  = H[f'Brightness Temperature (36.5GHz,V)'][:]/100
+            elif level == 'L1R':
+                tb_19_h  = H[f'Brightness Temperature ({resample_res},18.7GHz,H)'][:]/100
+                tb_19_v  = H[f'Brightness Temperature ({resample_res},18.7GHz,V)'][:]/100
+                tb_22_h  = H[f'Brightness Temperature ({resample_res},23.8GHz,H)'][:]/100
+                tb_22_v  = H[f'Brightness Temperature ({resample_res},23.8GHz,V)'][:]/100
+                tb_37_h  = H[f'Brightness Temperature ({resample_res},36.5GHz,H)'][:]/100
+                tb_37_v  = H[f'Brightness Temperature ({resample_res},36.5GHz,V)'][:]/100
+            else:
+                raise ValueError('Invalid level specified. Must be "L1B" or "L1R".')
             # generate latlon grid compatible with low frequency channels by modifying available 89GHz grid
             lat_a = H['Latitude of Observation Point for 89A'][:]
             lat   = lat_a[:,1::2]
