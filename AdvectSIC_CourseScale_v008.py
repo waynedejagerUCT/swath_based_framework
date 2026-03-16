@@ -24,6 +24,12 @@ from metpy.calc import divergence
 from metpy.units import units
 
 
+
+# -----------------------------------------------------------------------------
+# Config and setup
+# -----------------------------------------------------------------------------
+N_drift          = 10
+SWATH_SIGMA_KMPS = 0.00001736111  # RMSE ~1.5 km over 24 h -> 1.5/86400 km/s
 # -----------------------------------------------------------------------------
 # Helpers (kept essentially as in your scripts)
 # -----------------------------------------------------------------------------
@@ -149,6 +155,12 @@ def conservative_regrid_with_coverage(src_field, src_grid, dst_grid, min_cov=0.9
     dst_field = np.where(dst_cov >= min_cov, dst_field, np.nan)
     return dst_field
 
+def compute_divergence_1s(U_ms, V_ms, dx_m, dy_m, valid_drift):
+    u_q = U_ms * units("m/s")
+    v_q = V_ms * units("m/s")
+    div_1s = divergence(u_q, v_q, dx=dx_m * units.meter, dy=dy_m * units.meter).to("1/s").magnitude
+    return np.where(valid_drift & np.isfinite(div_1s), div_1s, np.nan)
+
 # -----------------------------------------------------------------------------
 # Product-specific readers (minimal branching)
 # -----------------------------------------------------------------------------
@@ -230,7 +242,7 @@ FDIR_ECICE  = "/home/waynedj/Data/intermediate/ecice/CaseStudy2019/L1R/res10/net
 f_ecice_t0  = os.path.join(FDIR_ECICE, "GW1AM2_201907261709_107A_L1SGRTBR_2220220-ECICE.nc")
 f_ecice_t1  = os.path.join(FDIR_ECICE, "GW1AM2_201907270213_203D_L1SGRTBR_2220220-ECICE.nc")
 # Output
-OUT_NC      = "/home/waynedj/Projects/swath_based_framework/Data/sic_decomposition_jaxa_ecice_TI_YI_FYI_MYI_on_driftgrid.nc"
+OUT_NC      = "/home/waynedj/Projects/swath_based_framework/Data/sic_decomposition_jaxa_ecice_TI_YI_FYI_MYI_on_driftgrid_v2.nc"
 # -----------------------------------------------------------------------------
 # Load common datasets (drift + NSIDC grid)
 # -----------------------------------------------------------------------------
@@ -280,19 +292,12 @@ dt_drift = np.where(np.isfinite(dt_drift) & (dt_drift > 0), dt_drift, np.nan)
 dx_m = float(np.nanmedian(np.diff(drift_x_m)))
 dy_m = float(np.nanmedian(np.diff(drift_y_m)))
 
-u_q = U * units("m/s")
-v_q = V * units("m/s")
-
-div_1s = divergence(u_q, v_q, dx=dx_m * units.meter, dy=dy_m * units.meter).to("1/s").magnitude
-div_1s = np.where(valid_drift & np.isfinite(div_1s), div_1s, np.nan)
-
-
 # -----------------------------------------------------------------------------
-# Core processing for one product stream
+# Core processing helpers for one product stream
 # -----------------------------------------------------------------------------
-def process_stream(ds0, ds1, product_key, stream_key, min_cov=0.9):
+def compute_sic_on_drift(ds0, ds1, product_key, stream_key, min_cov=0.9):
     """
-    Returns obs_dSIC, adv_dSIC, resid on drift grid (percent units).
+    Returns sic0_drift, sic1_drift (0..1) on drift grid.
     """
     # Swath -> fine (0..1)
     sic0_fine = read_swath_sic_fraction(ds0, product_key, stream_key, x1d_fine, y1d_fine, epsg=3031)
@@ -304,10 +309,15 @@ def process_stream(ds0, ds1, product_key, stream_key, min_cov=0.9):
 
     sic0_drift = np.clip(sic0_drift, 0.0, 1.0)
     sic1_drift = np.clip(sic1_drift, 0.0, 1.0)
+    return sic0_drift, sic1_drift
 
+def advect_with_velocity(sic0_drift, sic1_drift, U_ms, V_ms, div_1s, min_cov=0.9):
+    """
+    Returns adv_dSIC, resid on drift grid (percent units) for a given velocity field.
+    """
     # Build upstream grid (pull advection with rigid translation)
-    dx = U * dt_drift
-    dy = V * dt_drift
+    dx = U_ms * dt_drift
+    dy = V_ms * dt_drift
 
     # centers
     xc_up = drift_xc2d - dx
@@ -340,14 +350,74 @@ def process_stream(ds0, ds1, product_key, stream_key, min_cov=0.9):
     t01_mask = obs_mask & np.isfinite(sic01_divcorr) & valid_drift
 
     # Diagnostics (%)
-    obs_dSIC = np.where(obs_mask, (sic1_drift - sic0_drift) * 100.0, np.nan)
     adv_dSIC = np.where(t01_mask, (sic01_divcorr - sic0_drift) * 100.0, np.nan)
     resid    = np.where(t01_mask, (sic1_drift - sic01_divcorr) * 100.0, np.nan)
 
     # IMPORTANT:
-    # Do NOT apply valid_drift to obs_dSIC (it’s observational / swath-driven).
-    # Keep drift masking for adv_dSIC and resid (already enforced by t01_mask).
-    return obs_dSIC.astype(np.float32), adv_dSIC.astype(np.float32), resid.astype(np.float32)
+    return adv_dSIC.astype(np.float32), resid.astype(np.float32)
+
+def ensemble_stats(stack):
+    """
+    Compute ensemble mean and spread stats for a stack with shape (N, y, x).
+    Returns mean_field and spread_stats dict for printing.
+    """
+    mean_field = np.nanmean(stack, axis=0)
+    min_field = np.nanmin(stack, axis=0)
+    max_field = np.nanmax(stack, axis=0)
+    spread = max_field - min_field
+    stats = {
+        "mean": float(np.nanmean(spread)),
+        "min": float(np.nanmin(spread)),
+        "max": float(np.nanmax(spread)),
+        "std": float(np.nanstd(spread)),
+    }
+    return mean_field.astype(np.float32), stats
+
+def run_ensemble(ds0, ds1, product_key, stream_key, min_cov=0.9, rng=None):
+    """
+    Run N_drift realizations with perturbed drift velocities.
+    Returns obs_dSIC (deterministic), adv_dSIC_mean, resid_mean, and prints spread stats.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    sic0_drift, sic1_drift = compute_sic_on_drift(ds0, ds1, product_key, stream_key, min_cov=min_cov)
+
+    # Deterministic observed change (does not depend on drift)
+    obs_mask = np.isfinite(sic0_drift) & np.isfinite(sic1_drift)
+    obs_dSIC = np.where(obs_mask, (sic1_drift - sic0_drift) * 100.0, np.nan).astype(np.float32)
+
+    adv_stack = []
+    resid_stack = []
+    sigma_ms = SWATH_SIGMA_KMPS * 1000.0
+
+    for _ in range(N_drift):
+        dU = rng.uniform(-sigma_ms, sigma_ms, size=U.shape)
+        dV = rng.uniform(-sigma_ms, sigma_ms, size=V.shape)
+        dU = np.where(valid_drift, dU, 0.0)
+        dV = np.where(valid_drift, dV, 0.0)
+
+        U_i = U + dU
+        V_i = V + dV
+        div_i = compute_divergence_1s(U_i, V_i, dx_m, dy_m, valid_drift)
+
+        adv_i, resid_i = advect_with_velocity(sic0_drift, sic1_drift, U_i, V_i, div_i, min_cov=min_cov)
+        adv_stack.append(adv_i)
+        resid_stack.append(resid_i)
+
+    adv_stack = np.stack(adv_stack, axis=0)
+    resid_stack = np.stack(resid_stack, axis=0)
+
+    adv_mean, adv_stats = ensemble_stats(adv_stack)
+    resid_mean, resid_stats = ensemble_stats(resid_stack)
+
+    label = f"{product_key.upper()} {stream_key}"
+    print(f"{label} adv spread stats (percent): mean={adv_stats['mean']:.4f}, "
+          f"min={adv_stats['min']:.4f}, max={adv_stats['max']:.4f}, std={adv_stats['std']:.4f}")
+    print(f"{label} resid spread stats (percent): mean={resid_stats['mean']:.4f}, "
+          f"min={resid_stats['min']:.4f}, max={resid_stats['max']:.4f}, std={resid_stats['std']:.4f}")
+
+    return obs_dSIC, adv_mean, resid_mean
 
 
 # -----------------------------------------------------------------------------
@@ -366,11 +436,12 @@ ds_e1 = xr.open_dataset(f_ecice_t1, engine=spec_e["engine"], **spec_e["open_kwar
 # Compute outputs
 min_cov = 0.9
 
-obs_jaxa, adv_jaxa, resid_jaxa = process_stream(ds_j0, ds_j1, "jaxa", "SIC", min_cov=min_cov)
-obs_ti,   adv_ti,   resid_ti   = process_stream(ds_e0, ds_e1, "ecice", "TI",  min_cov=min_cov)
-obs_yi,   adv_yi,   resid_yi   = process_stream(ds_e0, ds_e1, "ecice", "YI",  min_cov=min_cov)
-obs_fyi,  adv_fyi,  resid_fyi  = process_stream(ds_e0, ds_e1, "ecice", "FYI", min_cov=min_cov)
-obs_myi,  adv_myi,  resid_myi  = process_stream(ds_e0, ds_e1, "ecice", "MYI", min_cov=min_cov)
+rng = np.random.default_rng()
+obs_jaxa, adv_jaxa, resid_jaxa = run_ensemble(ds_j0, ds_j1, "jaxa", "SIC", min_cov=min_cov, rng=rng)
+obs_ti,   adv_ti,   resid_ti   = run_ensemble(ds_e0, ds_e1, "ecice", "TI",  min_cov=min_cov, rng=rng)
+obs_yi,   adv_yi,   resid_yi   = run_ensemble(ds_e0, ds_e1, "ecice", "YI",  min_cov=min_cov, rng=rng)
+obs_fyi,  adv_fyi,  resid_fyi  = run_ensemble(ds_e0, ds_e1, "ecice", "FYI", min_cov=min_cov, rng=rng)
+obs_myi,  adv_myi,  resid_myi  = run_ensemble(ds_e0, ds_e1, "ecice", "MYI", min_cov=min_cov, rng=rng)
 
 
 # -----------------------------------------------------------------------------

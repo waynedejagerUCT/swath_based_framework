@@ -21,7 +21,7 @@ from datetime import datetime
 # Config: drift distributions
 # --------------------------------------------------
 DRIFT_FDIR              = "/home/waynedj/Data/seaicedrift/osisaf/swath/2019/07/"
-DRIFT_N_SAMPLE          = 20
+DRIFT_N_SAMPLE          = 10
 DRIFT_USE_RANDOM_SUBSET = False
 LAT_RANGE               = [-75, -55]
 LON_RANGE               = [-60, 0]
@@ -309,9 +309,12 @@ ax_tb_shared.tick_params(labelcolor="none", top=False, bottom=False, left=False,
 for spine in ax_tb_shared.spines.values():
     spine.set_visible(False)
 
-sic_inner     = outer[0, 1].subgridspec(2, 1, hspace=0.05)
-ax_sic_bs     = fig.add_subplot(sic_inner[0, 0])
-ax_sic_ecice  = fig.add_subplot(sic_inner[1, 0], sharex=ax_sic_bs)
+# Broken x-axis layout for SIC panels (0–90 and 90–100, 50/50 split)
+sic_inner        = outer[0, 1].subgridspec(2, 2, width_ratios=[1, 1], hspace=0.05, wspace=0.01)
+ax_sic_bs_left   = fig.add_subplot(sic_inner[0, 0])
+ax_sic_bs_right  = fig.add_subplot(sic_inner[0, 1])
+ax_sic_ecice_left  = fig.add_subplot(sic_inner[1, 0])
+ax_sic_ecice_right = fig.add_subplot(sic_inner[1, 1])
 ax_sic_shared = fig.add_subplot(outer[0, 1], frameon=False)
 ax_sic_shared.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
 for spine in ax_sic_shared.spines.values():
@@ -342,7 +345,7 @@ hist_bins   = np.arange(x_lim[0], x_lim[1] + bin_width, bin_width)
 
 alpha = 0.4
 ax_div.hist(div_main, bins=hist_bins, density=True, alpha=alpha, color="k", label='Subsample')
-ax_div.hist(div_case, bins=hist_bins, density=True, alpha=alpha, color="darkorange",histtype='step', label='Case Study', linewidth=3)
+ax_div.hist(div_case, bins=hist_bins, density=True, alpha=1, color="darkorange",histtype='step', label='Case Study', linewidth=3)
 
 div_main_clean = np.asarray(div_main[np.isfinite(div_main)])
 div_case_clean = np.asarray(div_case[np.isfinite(div_case)])
@@ -376,9 +379,9 @@ fig.colorbar(pcm, cax=cax, orientation="horizontal")
 
 alpha = 0.4
 ax_histx.hist(x_main, bins=hist2d_bins, density=True, alpha=alpha, color="k")
-ax_histx.hist(x_case, bins=hist2d_bins, density=True, alpha=alpha, color="darkorange", histtype='step', linewidth=3)
+ax_histx.hist(x_case, bins=hist2d_bins, density=True, alpha=1, color="darkorange", histtype='step', linewidth=3)
 ax_histy.hist(y_main, bins=hist2d_bins, density=True, alpha=alpha, color="k", orientation="horizontal")
-ax_histy.hist(y_case, bins=hist2d_bins, density=True, alpha=alpha, color="darkorange", histtype='step', linewidth=3, orientation="horizontal")
+ax_histy.hist(y_case, bins=hist2d_bins, density=True, alpha=1, color="darkorange", histtype='step', linewidth=3, orientation="horizontal")
 ax_histx.set_ylim([0,7])
 ax_histy.set_xlim([0,7])
 
@@ -534,72 +537,95 @@ ax_tb37v.tick_params(axis="y", labelleft=False)
 ax_tb_shared.set_xlabel("Brightness Tempearture (k)", fontsize=FONTSIZE, labelpad=10)
 ax_tb_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=12)
 
-sic_bins = np.arange(0, 101, 1)
 sic_alpha = 0.4
+sic_left_bins = np.arange(0, 90.5, 1.0)
+sic_right_bins = np.arange(90, 100.1, 0.1)
 
-for ax_sic, main_vals, case_t0_vals, case_t1_vals, color, base_label in [
-    (ax_sic_bs, df_main_bs["sic"], df_case_bs_t0["sic"], df_case_bs_t1["sic"], "r", "Bootstrap"),
-    (ax_sic_ecice, df_main_ecice["sic"], df_case_ecice_t0["sic"], df_case_ecice_t1["sic"], "b", "ECICE"),
+def filter_sic_range(values, vmin, vmax):
+    vals = filter_nonzero_sic(values)
+    return vals[(vals >= vmin) & (vals <= vmax)]
+
+def max_density_for_bins(values_list, bins):
+    max_val = 0.0
+    for vals in values_list:
+        vals = vals[(vals >= bins[0]) & (vals <= bins[-1])]
+        if vals.size < 2:
+            continue
+        hist, _ = np.histogram(vals, bins=bins, density=True)
+        if hist.size:
+            max_val = max(max_val, np.nanmax(hist))
+    return max_val
+
+for (ax_left, ax_right, main_vals, case_t0_vals, case_t1_vals, color, base_label) in [
+    (ax_sic_bs_left, ax_sic_bs_right, df_main_bs["sic"], df_case_bs_t0["sic"], df_case_bs_t1["sic"], "r", "Bootstrap"),
+    (ax_sic_ecice_left, ax_sic_ecice_right, df_main_ecice["sic"], df_case_ecice_t0["sic"], df_case_ecice_t1["sic"], "b", "ECICE"),
 ]:
     main_vals_clean = filter_nonzero_sic(main_vals)
     case_t0_clean = filter_nonzero_sic(case_t0_vals)
     case_t1_clean = filter_nonzero_sic(case_t1_vals)
 
-    plot_hist_with_kde(
-        ax_sic,
-        main_vals_clean,
-        sic_bins,
-        'k',
-        color,
-        f"{base_label}",
-        alpha=sic_alpha,
-        plot_hist=True,
-        plot_curve=False
-    )
-    plot_hist_with_kde(
-        ax_sic,
-        case_t0_clean,
-        sic_bins,
-        'limegreen',
-        color,
-        rf"{base_label} t$_{{0}}$",
-        alpha=sic_alpha,
-        linestyle="-",
-        plot_hist=True,
-        plot_curve=False,
-        histtype="step",
-        linewidth=1.5,
-    )
-    plot_hist_with_kde(
-        ax_sic,
-        case_t1_clean,
-        sic_bins,
-        'magenta',
-        color,
-        rf"{base_label} t$_{{1}}$",
-        alpha=sic_alpha,
-        linestyle=":",
-        plot_hist=True,
-        plot_curve=False,
-        histtype="step",
-        linewidth=1.5,
-    )
-    ax_sic.grid(True, linestyle=":", color="k", alpha=0.5)
-    ax_sic.legend(loc='upper center', fontsize=FONTSIZE - 4)
-    ax_sic.set_xlim([80,100])
-    ax_sic.set_ylim([0, 0.8])
+    # Left (0–90)
+    plot_hist_with_kde(ax_left, main_vals_clean, sic_left_bins, 'k', color, f"{base_label}", alpha=sic_alpha, plot_hist=True, plot_curve=False)
+    plot_hist_with_kde(ax_left, case_t0_clean, sic_left_bins, 'limegreen', color, rf"{base_label} t$_{{0}}$", alpha=sic_alpha, linestyle="-", plot_hist=True, plot_curve=False, histtype="step", linewidth=1.5)
+    plot_hist_with_kde(ax_left, case_t1_clean, sic_left_bins, 'magenta', color, rf"{base_label} t$_{{1}}$", alpha=sic_alpha, linestyle=":", plot_hist=True, plot_curve=False, histtype="step", linewidth=1.5)
+    ax_left.set_xlim([0, 90])
 
-ax_sic_bs.tick_params(axis="x", labelbottom=False)
-ax_sic_ecice.set_xlabel("SIC (%)", fontsize=FONTSIZE, labelpad=10)
-ax_sic_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=12)
+    # Right (90–100)
+    plot_hist_with_kde(ax_right, main_vals_clean, sic_right_bins, 'k', color, f"{base_label}", alpha=sic_alpha, plot_hist=True, plot_curve=False)
+    plot_hist_with_kde(ax_right, case_t0_clean, sic_right_bins, 'limegreen', color, rf"{base_label} t$_{{0}}$", alpha=sic_alpha, linestyle="-", plot_hist=True, plot_curve=False, histtype="step", linewidth=1.5)
+    plot_hist_with_kde(ax_right, case_t1_clean, sic_right_bins, 'magenta', color, rf"{base_label} t$_{{1}}$", alpha=sic_alpha, linestyle=":", plot_hist=True, plot_curve=False, histtype="step", linewidth=1.5)
+    ax_right.set_xlim([90, 100])
+
+    # Independent y-limits per segment based on peak density
+    left_peak = max_density_for_bins(
+        [filter_sic_range(main_vals_clean, 0, 90), filter_sic_range(case_t0_clean, 0, 90), filter_sic_range(case_t1_clean, 0, 90)],
+        sic_left_bins,
+    )
+    right_peak = max_density_for_bins(
+        [filter_sic_range(main_vals_clean, 90, 100), filter_sic_range(case_t0_clean, 90, 100), filter_sic_range(case_t1_clean, 90, 100)],
+        sic_right_bins,
+    )
+    ax_left.set_ylim([0, 0.06])
+    ax_right.set_ylim([0, 0.3])
+
+    ax_left.grid(True, linestyle=":", color="k", alpha=0.5)
+    ax_right.grid(True, linestyle=":", color="k", alpha=0.5)
+    ax_left.legend(loc='upper center', fontsize=FONTSIZE - 4)
+
+    # Broken-axis styling
+    ax_left.spines["right"].set_visible(False)
+    ax_right.spines["left"].set_visible(False)
+    ax_right.yaxis.tick_right()
+    ax_right.tick_params(labelleft=False)
+
+    d = 0.015
+    kwargs = dict(transform=ax_left.transAxes, color="k", clip_on=False, linewidth=0.8)
+    ax_left.plot((1 - d, 1 + d), (-d, +d), **kwargs)
+    ax_left.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
+    kwargs.update(transform=ax_right.transAxes)
+    ax_right.plot((-d, +d), (-d, +d), **kwargs)
+    ax_right.plot((-d, +d), (1 - d, 1 + d), **kwargs)
+
+ax_sic_bs_left.tick_params(axis="x", labelbottom=False)
+ax_sic_bs_right.tick_params(axis="x", labelbottom=False)
+ax_sic_shared.set_xlabel("SIC (%)", fontsize=FONTSIZE, labelpad=10)
+ax_sic_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=14)
+
+# Remove the first x tick label on the bottom-right panel to avoid overlap at the break
+_ticks = ax_sic_ecice_right.get_xticks()
+_labels = [f"{t:g}" for t in _ticks]
+if _labels:
+    _labels[0] = ""
+    ax_sic_ecice_right.set_xticks(_ticks)
+    ax_sic_ecice_right.set_xticklabels(_labels)
 
 subplot_labels = [
     (ax_tb19h,     "(a)", 0.04, 0.96),
     (ax_tb19v,     "(b)", 0.04, 0.96),
     (ax_tb37h,     "(c)", 0.04, 0.96),
     (ax_tb37v,     "(d)", 0.04, 0.96),
-    (ax_sic_bs,    "(e)", 0.02, 0.96),
-    (ax_sic_ecice, "(f)", 0.02, 0.96),
+    (ax_sic_bs_left,    "(e)", 0.04, 0.96),
+    (ax_sic_ecice_left, "(f)", 0.04, 0.96),
     (ax_div,       "(g)", 0.02, 0.98),
     (ax_scatter,   "(h)", 0.02, 0.98),
     (ax_histx,     "(i)", 0.02, 0.94),
@@ -624,7 +650,7 @@ for ax, label, x_loc, y_loc in subplot_labels:
     )
 
 # Unified tick label font size across all subplot axes
-for ax in [ax_tb19h, ax_tb19v, ax_tb37h, ax_tb37v, ax_sic_bs, ax_sic_ecice, ax_div, ax_scatter, ax_histx, ax_histy]:
+for ax in [ax_tb19h, ax_tb19v, ax_tb37h, ax_tb37v, ax_sic_bs_left, ax_sic_bs_right, ax_sic_ecice_left, ax_sic_ecice_right, ax_div, ax_scatter, ax_histx, ax_histy]:
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE_TICKLABELS)
 
 

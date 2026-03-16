@@ -57,6 +57,7 @@ yi_var_name      = "YI"
 fyi_var_name     = "FYI"
 vmin             = 0
 vmax             = 100
+conf_threshold   = 0.65
 cmap             = "jet"
 pcm_shading      = "auto"
 extent           = [-120000, 90000, 3450000, 3600000]
@@ -185,12 +186,60 @@ for i in range(5):
         ecice_ti_data = squeeze_first(ds_ecice[ti_var_name])
         ecice_yi_data = squeeze_first(ds_ecice[yi_var_name])
         ecice_fyi_data = squeeze_first(ds_ecice[fyi_var_name])
+        conf_yi = squeeze_first(ds_ecice["CONF_I1"])
+        conf_fyi = squeeze_first(ds_ecice["CONF_I2"])
         ecice_lon = ds_ecice['longitude'].data
         ecice_lat = ds_ecice['latitude'].data
+
+    yi_mask = conf_yi < conf_threshold
+    fyi_mask = conf_fyi < conf_threshold
 
     im_ti = ax_ecice_ti.pcolormesh(ecice_lon,ecice_lat,ecice_ti_data,cmap=custom_colormap(cmap),vmin=vmin,vmax=vmax,shading=pcm_shading,transform=proj_pl,)
     im_yi = ax_ecice_yi.pcolormesh(ecice_lon,ecice_lat,ecice_yi_data,cmap=custom_colormap(cmap),vmin=vmin,vmax=vmax,shading=pcm_shading,transform=proj_pl,)
     im_fyi = ax_ecice_fyi.pcolormesh(ecice_lon,ecice_lat,ecice_fyi_data,cmap=custom_colormap(cmap),vmin=vmin,vmax=vmax,shading=pcm_shading,transform=proj_pl,)
+
+    # Hatch low-confidence regions (CONF_* < conf_threshold)
+    with mpl.rc_context({"hatch.color": "k", "hatch.linewidth": 1.2}):
+        ax_ecice_yi.contourf(
+            ecice_lon,
+            ecice_lat,
+            yi_mask.astype(int),
+            levels=[0.5, 1.5],
+            hatches=["xx"],
+            colors="none",
+            transform=proj_pl,
+        )
+        ax_ecice_fyi.contourf(
+            ecice_lon,
+            ecice_lat,
+            fyi_mask.astype(int),
+            levels=[0.5, 1.5],
+            hatches=["xx"],
+            colors="none",
+            transform=proj_pl,
+        )
+    with mpl.rc_context({"hatch.color": "white", "hatch.linewidth": 0.7}):
+        ax_ecice_yi.contourf(
+            ecice_lon,
+            ecice_lat,
+            yi_mask.astype(int),
+            levels=[0.5, 1.5],
+            hatches=["xx"],
+            colors="none",
+            transform=proj_pl,
+        )
+        ax_ecice_fyi.contourf(
+            ecice_lon,
+            ecice_lat,
+            fyi_mask.astype(int),
+            levels=[0.5, 1.5],
+            hatches=["xx"],
+            colors="none",
+            transform=proj_pl,
+        )
+
+
+    
     ax_ecice_ti.set_axis_off()
     ax_ecice_yi.set_axis_off()
     ax_ecice_fyi.set_axis_off()
@@ -242,8 +291,8 @@ cbar = fig.colorbar(im_for_cbar, cax=cbar_ax, orientation='horizontal', label=f'
 cbar.ax.xaxis.label.set_size(20)
 cbar.ax.tick_params(labelsize=18)
 
-plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure05_v001.png', dpi=800, bbox_inches='tight')
+plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure05_v004.png', dpi=800, bbox_inches='tight')
 plt.show()
-plt.close()
+#plt.close()
 
 # %%
