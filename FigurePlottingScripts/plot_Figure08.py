@@ -80,7 +80,7 @@ fields = {
         ds["adv_dSIC_jaxa"].values,
         ds["resid_jaxa"].values,
     ),
-    "ECICE$_{TI}$": (
+    "ECICE$_{total}$": (
         ds["obs_dSIC_ecice_TI"].values,
         ds["adv_dSIC_ecice_TI"].values,
         ds["resid_ecice_TI"].values,
@@ -97,7 +97,7 @@ fields = {
         ds["obs_dSIC_jaxa"].values,
         ds["adv_dSIC_jaxa"].values,
         ds["resid_jaxa"].values,),
-    "ECICE$_{TI}$": (
+    "ECICE$_{total}$": (
         ds["obs_dSIC_ecice_TI"].values,
         ds["adv_dSIC_ecice_TI"].values,
         ds["resid_ecice_TI"].values,),}
@@ -214,7 +214,6 @@ cb = fig.colorbar(
 cb.set_label("ΔSIC (%)", fontsize=20)
 cb.ax.tick_params(labelsize=16)
 
-plt.show()
-#plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure08_v001.png', dpi=500, bbox_inches='tight')
-#plt.close()
+plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure08_v001.png', dpi=500, bbox_inches='tight')
+plt.close()
 #%%

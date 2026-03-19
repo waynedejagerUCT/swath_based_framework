@@ -92,24 +92,31 @@ def CustomColorMap2(cmap_name):
     cmap2.set_over(colors[-1])
     return cmap2
 
-def extract_ice_type_sic(path, ice_type):
+def extract_sic_with_ti_mask(path, ice_types):
     ds = xr.open_dataset(path)
     lats = ds["latitude"].values.ravel().astype(float)
     lons = ds["longitude"].values.ravel().astype(float)
-    vals = ds[ice_type].values.ravel().astype(float)
-    ds.close()
-    mask = (
+    ti_vals = ds["TI"].values.ravel().astype(float)
+
+    geo_mask = (
         np.isfinite(lats)
         & np.isfinite(lons)
         & (lats >= LAT_RANGE[0])
         & (lats <= LAT_RANGE[1])
         & (lons >= LON_RANGE[0])
         & (lons <= LON_RANGE[1])
-        & np.isfinite(vals)
-        & (vals > 0)
-        & (vals <= 100)
     )
-    return vals[mask]
+    ti_mask = np.isfinite(ti_vals) & (ti_vals > 0) & (ti_vals <= 100)
+    base_mask = geo_mask & ti_mask
+
+    out = {}
+    for ice_type in ice_types:
+        vals = ds[ice_type].values.ravel().astype(float)
+        mask = base_mask & np.isfinite(vals) & (vals <= 100)
+        out[ice_type] = vals[mask]
+
+    ds.close()
+    return out
 
 def collect_all_sic_by_type(data_dir, ice_types):
     out = {k: [] for k in ice_types}
@@ -120,23 +127,10 @@ def collect_all_sic_by_type(data_dir, ice_types):
     )
 
     for path in files:
-        ds = xr.open_dataset(path)
-        lats = ds["latitude"].values.ravel().astype(float)
-        lons = ds["longitude"].values.ravel().astype(float)
-        geo_mask = (
-            np.isfinite(lats)
-            & np.isfinite(lons)
-            & (lats >= LAT_RANGE[0])
-            & (lats <= LAT_RANGE[1])
-            & (lons >= LON_RANGE[0])
-            & (lons <= LON_RANGE[1])
-        )
+        sic_dict = extract_sic_with_ti_mask(path, ice_types)
         for k in ice_types:
-            vals = ds[k].values.ravel().astype(float)
-            vals = vals[geo_mask & np.isfinite(vals) & (vals > 0) & (vals <= 100)]
-            if vals.size:
-                out[k].append(vals)
-        ds.close()
+            if sic_dict[k].size:
+                out[k].append(sic_dict[k])
 
     for k in ice_types:
         if out[k]:
@@ -164,11 +158,18 @@ ds = xr.open_dataset(DECOMP_NC)
 lon2d = ds["lon"].values
 lat2d = ds["lat"].values
 
-obs_fields = {
-    "YI": ds["obs_dSIC_ecice_YI"].values,
-    "FYI": ds["obs_dSIC_ecice_FYI"].values,
-    "MYI": ds["obs_dSIC_ecice_MYI"].values,
+obs_var_map = {
+    "TI": "obs_dSIC_ecice_TI",
+    "YI": "obs_dSIC_ecice_YI",
+    "FYI": "obs_dSIC_ecice_FYI",
+    "MYI": "obs_dSIC_ecice_MYI",
 }
+obs_fields = {}
+for key, var in obs_var_map.items():
+    if var in ds:
+        obs_fields[key] = ds[var].values
+    else:
+        print(f"[plot_Figure09] Warning: '{var}' not found in dataset; skipping {key}.")
 
 ds_t0   = xr.open_dataset(F_ECICE_T0)
 ds_t1   = xr.open_dataset(F_ECICE_T1)
@@ -193,14 +194,20 @@ obs_plot = {}
 for k, arr in obs_fields.items():
     obs_plot[k] = np.where(mask_union, arr, np.nan)
 
-# -----------------------------------------------------------------------------
-# Histogram datasets
-# -----------------------------------------------------------------------------
-hist_types = ["TI", "YI", "FYI", "MYI"]
+def print_pcolormesh_minmax(label, arr):
+    finite = np.isfinite(arr)
+    if not np.any(finite):
+        print(f"[plot_Figure09] {label} pcolormesh: no finite values after masking.")
+        return
+    vmin_plot = float(np.nanmin(arr))
+    vmax_plot = float(np.nanmax(arr))
+    print(f"[plot_Figure09] {label} pcolormesh: min={vmin_plot:.3f}, max={vmax_plot:.3f}")
 
-all_sic = collect_all_sic_by_type(FDIR_ECICE, hist_types)
-t0_sic = {k: extract_ice_type_sic(F_ECICE_T0, k) for k in hist_types}
-t1_sic = {k: extract_ice_type_sic(F_ECICE_T1, k) for k in hist_types}
+for key in ["TI", "YI", "FYI", "MYI"]:
+    if key in obs_plot:
+        print_pcolormesh_minmax(key, obs_plot[key])
+    else:
+        print(f"[plot_Figure09] {key} pcolormesh: not available (missing source variable).")
 
 # -----------------------------------------------------------------------------
 # Figure
@@ -214,105 +221,18 @@ proj_ps = ccrs.SouthPolarStereo(central_longitude=0)
 proj_pl = ccrs.PlateCarree()
 
 fig = plt.figure(figsize=(14, 16))
-outer = fig.add_gridspec(2, 2, wspace=0.13, hspace=0.08, bottom=0.10, top=0.96)
+outer = fig.add_gridspec(2, 2, wspace=0.08, hspace=0.03, bottom=0.10, top=0.96)
 
-# Top-left: inner 2x2 histogram panel
-inner       = outer[0, 0].subgridspec(2, 2, hspace=0.08, wspace=0.08)
-ax_ti       = fig.add_subplot(inner[0, 0])
-ax_yi_hist  = fig.add_subplot(inner[0, 1], sharex=ax_ti)
-ax_fyi_hist = fig.add_subplot(inner[1, 0], sharex=ax_ti)
-ax_myi_hist = fig.add_subplot(inner[1, 1], sharex=ax_ti)
-
-hist_axes = {
-    "TI": ax_ti,
-    "YI": ax_yi_hist,
-    "FYI": ax_fyi_hist,
-    "MYI": ax_myi_hist,
-}
-hist_ylims = {
-    "TI": [0,0.45],
-    "YI": [0,0.04],
-    "FYI": [0,0.2],
-    "MYI": [0,0.04],
-}
-
-sic_bins = np.arange(0, 102, 2)
-for k, ax in hist_axes.items():
-    ax.hist(
-        all_sic[k],
-        bins=sic_bins,
-        density=True,
-        histtype="bar",
-        linewidth=1.0,
-        color="k",
-        alpha=0.4,
-        label=f"{k}",
-    )
-    ax.hist(
-        t0_sic[k],
-        bins=sic_bins,
-        density=True,
-        histtype="step",
-        linewidth=1.8,
-        color="limegreen",
-        alpha=0.8,
-        label=f"{k} t$_{{0}}$",
-    )
-    ax.hist(
-        t1_sic[k],
-        bins=sic_bins,
-        density=True,
-        histtype="step",
-        linewidth=1.8,
-        color="magenta",
-        alpha=0.8,
-        label=f"{k} t$_{{1}}$",
-    )
-    ax.set_xlim(0, 100)
-    if hist_ylims.get(k) is not None:
-        ax.set_ylim(hist_ylims[k])
-    ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
-    ax.grid(True, linestyle=":", color="k", alpha=0.45)
-    ax.legend(loc="upper center", fontsize=8)
-
-ax_ti.tick_params(axis="x", labelbottom=False)
-ax_yi_hist.tick_params(axis="x", labelbottom=False)
-ax_yi_hist.yaxis.set_ticks_position("right")
-ax_yi_hist.tick_params(axis="y", labelleft=False, labelright=True)
-ax_myi_hist.yaxis.set_ticks_position("right")
-ax_myi_hist.tick_params(axis="y", labelleft=False, labelright=True)
-
-# Shared y-label for inner histogram block
-ax_hist_shared = fig.add_subplot(outer[0, 0], frameon=False)
-ax_hist_shared.tick_params(labelcolor="none", top=False, bottom=False, left=False, right=False)
-for spine in ax_hist_shared.spines.values():
-    spine.set_visible(False)
-ax_hist_shared.set_ylabel("Probability Density", fontsize=18, labelpad=22)
-ax_hist_shared.set_xlabel("SIC (%)", fontsize=18)
-
-# Inner panel labels
-for ax, lab in [(ax_ti, "(a)"), (ax_yi_hist, "(b)"), (ax_fyi_hist, "(c)"), (ax_myi_hist, "(d)")]:
-    ax.text(
-        0.04,
-        0.97,
-        lab,
-        transform=ax.transAxes,
-        va="top",
-        ha="left",
-        fontsize=12,
-        bbox=dict(facecolor="white", edgecolor="k"),
-        zorder=20,
-    )
-
-# Other 3 panels: dCobs maps
+ax_ti = fig.add_subplot(outer[0, 0], projection=proj_ps)
 ax_yi = fig.add_subplot(outer[0, 1], projection=proj_ps)
 ax_fyi = fig.add_subplot(outer[1, 0], projection=proj_ps)
 ax_myi = fig.add_subplot(outer[1, 1], projection=proj_ps)
 
 map_axes = [
-    (ax_yi, "YI", "(e)"),
-    (ax_fyi, "FYI", "(f)"),
-    (ax_myi, "MYI", "(g)"),
+    (ax_ti, "TI", "(a)"),
+    (ax_yi, "YI", "(b)"),
+    (ax_fyi, "FYI", "(c)"),
+    (ax_myi, "MYI", "(d)"),
 ]
 
 im = None
@@ -361,8 +281,8 @@ for ax, key, panel in map_axes:
     gl.ylocator = mticker.FixedLocator(np.arange(-90, -40, 5))
     gl.right_labels = True
     gl.bottom_labels = False
-    gl.left_labels = (ax in [ax_yi, ax_fyi])
-    gl.top_labels = (ax == ax_yi)
+    #gl.left_labels = (ax in [ax_yi, ax_fyi])
+    #gl.top_labels = (ax == ax_yi)
     gl.xlabel_style = {"size": FONTSIZE_TICKLABELS}
     gl.ylabel_style = {"size": FONTSIZE_TICKLABELS}
 
@@ -373,11 +293,10 @@ cb.set_label("ΔSIC (%)", fontsize=18)
 cb.ax.tick_params(labelsize=FONTSIZE_TICKLABELS)
 
 # Unified tick label size for all subplot axes
-for ax in [ax_ti, ax_yi_hist, ax_fyi_hist, ax_myi_hist, ax_yi, ax_fyi, ax_myi]:
+for ax in [ax_ti, ax_yi, ax_fyi, ax_myi]:
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE_TICKLABELS-3)
 
 
-plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure09_v001.png",dpi=500,bbox_inches="tight",)
+plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure09_v002.png",dpi=500,bbox_inches="tight",)
 plt.close()
-
 #%%

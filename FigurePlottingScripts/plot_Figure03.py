@@ -1,5 +1,6 @@
 
 
+#%%
 #!/usr/bin/env python3
 """
 Script to plot frequency distributions of brightness temperatures and gradient ratios
@@ -10,6 +11,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 
 # Configuration
 DATA_DIR = '/home/waynedj/Projects/ecice/processing'
@@ -61,7 +63,7 @@ def load_data():
     for ice_type, filename in ICE_TYPE_FILES.items():
         file_path = os.path.join(DATA_DIR, filename)
         # Read data and replace zeros with NaN
-        df = pd.read_csv(file_path, delim_whitespace=True)[TB_PARAMETERS]
+        df = pd.read_csv(file_path, sep=r'\s+', engine='python')[TB_PARAMETERS]
         df = df.replace(0, np.nan)  # Replace zero values with NaN
         dataframes[ice_type] = df
     return dataframes
@@ -72,10 +74,16 @@ def setup_figure():
     #fig.suptitle('Frequency Distribution of Antarctic Sea-ice Type', fontsize=18)
     fig.patch.set_facecolor('white')
     
+    y_formatter = ScalarFormatter(useMathText=True)
+    y_formatter.set_scientific(True)
+    y_formatter.set_powerlimits((0, 0))
     # Configure all subplots
     for ax in axes.flatten():
         ax.grid(True, linestyle=':', color='k', alpha=0.5)
-        ax.set_ylabel('Relative frequency', fontsize=18)
+        ax.set_ylabel('Relative frequency', fontsize=20)
+        ax.tick_params(axis='both', which='major', labelsize=16)
+        ax.yaxis.set_major_formatter(y_formatter)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
     
     return fig, axes.flatten()
 
@@ -98,8 +106,8 @@ def plot_distributions(dataframes):
         # Configure subplot
         # Add units to x-label except for gradient ratio
         units = '' if column == 'GD37v19v' else ' [K]'
-        ax.set_xlabel(f'{PARAM_LABELS[column]}{units}', fontsize=18)
-        ax.legend(fontsize=14, loc='upper left')
+        ax.set_xlabel(f'{PARAM_LABELS[column]}{units}', fontsize=20)
+        ax.legend(fontsize=18, loc='upper left')
         ax.text(0.96, 0.96, f'({chr(97+idx)})', 
                 transform=ax.transAxes, fontsize=20, ha='right', va='top',
                 bbox=dict(facecolor='white', alpha=1, edgecolor='black'))
@@ -121,7 +129,7 @@ def main():
     plt.tight_layout()
     
     # Save the figure first
-    plt.savefig('/home/waynedj/Projects/publication/paper_03/figure01.png', 
+    plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure03_v001.png', 
                 dpi=400, bbox_inches='tight', format='png')
     
     # Then display it
@@ -137,3 +145,4 @@ if __name__ == '__main__':
 
 
 
+# %%
