@@ -247,8 +247,8 @@ for P in P_list:
         axt.axvline(tmid, color="k", linewidth=2.0, alpha=0.35, zorder=0)
 
 # Legend only once (top-left map)
-ax_map["P108"].legend(loc="upper left", fontsize=9)
-ax_map["P106"].legend(loc="upper left", fontsize=9)
+ax_map["P108"].legend(loc="upper left", fontsize=11)
+ax_map["P106"].legend(loc="upper left", fontsize=11)
 
 ax_ts["P108"].tick_params(axis="x", which="both", labelbottom=False)
 ax_ts["P108"].set_xlabel("")
@@ -273,7 +273,7 @@ for i, ax in enumerate(panel_axes):
         ),
     )
 
-plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure06_v001.png",dpi=500,bbox_inches="tight")
+plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure06_v002.png",dpi=500,bbox_inches="tight")
 plt.close()
 
 # %%

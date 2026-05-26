@@ -150,13 +150,15 @@ F_ECICE_T1 = "/home/waynedj/Data/intermediate/ecice/CaseStudy2019/L1R/res10/netc
 FDIR_ECICE = "/home/waynedj/Data/intermediate/ecice/CaseStudy2019/L1R/res10/netcdf/"
 LAT_RANGE = [-75, -55]
 LON_RANGE = [-60, 0]
-FONTSIZE_TICKLABELS     = 13
+FONTSIZE_TICKLABELS     = 16
 # -----------------------------------------------------------------------------
 # Load decomposition and swaths
 # -----------------------------------------------------------------------------
 ds = xr.open_dataset(DECOMP_NC)
 lon2d = ds["lon"].values
 lat2d = ds["lat"].values
+
+jaxa_obs_mask = np.isnan(ds["obs_dSIC_jaxa"].values)
 
 obs_var_map = {
     "TI": "obs_dSIC_ecice_TI",
@@ -192,7 +194,7 @@ mask_union = mask_t0 | mask_t1
 
 obs_plot = {}
 for k, arr in obs_fields.items():
-    obs_plot[k] = np.where(mask_union, arr, np.nan)
+    obs_plot[k] = np.where(mask_union & ~jaxa_obs_mask, arr, np.nan)
 
 def print_pcolormesh_minmax(label, arr):
     finite = np.isfinite(arr)
@@ -289,7 +291,7 @@ for ax, key, panel in map_axes:
 # Shared colorbar (bottom)
 cax = fig.add_axes([0.22, 0.06, 0.56, 0.025])
 cb = fig.colorbar(im, cax=cax, orientation="horizontal")
-cb.set_label("ΔSIC (%)", fontsize=18)
+cb.set_label("ΔSIC (%)", fontsize=22)
 cb.ax.tick_params(labelsize=FONTSIZE_TICKLABELS)
 
 # Unified tick label size for all subplot axes
@@ -297,6 +299,6 @@ for ax in [ax_ti, ax_yi, ax_fyi, ax_myi]:
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE_TICKLABELS-3)
 
 
-plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure09_v002.png",dpi=500,bbox_inches="tight",)
+plt.savefig("/home/waynedj/Projects/swath_based_framework/figures/publication/Figure09_v003.png",dpi=500,bbox_inches="tight",)
 plt.close()
 #%%

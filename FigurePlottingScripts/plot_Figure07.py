@@ -25,8 +25,8 @@ DRIFT_N_SAMPLE          = 10
 DRIFT_USE_RANDOM_SUBSET = False
 LAT_RANGE               = [-75, -55]
 LON_RANGE               = [-60, 0]
-FONTSIZE                = 18
-FONTSIZE_TICKLABELS     = 13
+FONTSIZE                = 22
+FONTSIZE_TICKLABELS     = 17
 kde_on                  = False
 _TS_RE                  = re.compile(r"_(\d{14})w_(\d{14})w(?:\.[^.]+)?$")
 np.seterr(divide='ignore', invalid='ignore')
@@ -290,7 +290,7 @@ def filter_nonzero_sic(values):
 fig = plt.figure(figsize=(22, 20))
 fig.patch.set_facecolor("white")
 
-outer      = GridSpec(2, 2, height_ratios=[5, 5], width_ratios=[5, 5], hspace=0.12, wspace=0.15)
+outer      = GridSpec(2, 2, height_ratios=[5, 5], width_ratios=[5, 5], hspace=0.12, wspace=0.18)
 ax_div     = fig.add_subplot(outer[1, 0])
 
 tb_inner   = outer[0, 0].subgridspec(2, 2, hspace=0.05, wspace=0.05)
@@ -373,7 +373,9 @@ pcm = ax_scatter.pcolormesh(xedges, yedges, h2d, cmap=custom_colormap("Greys"), 
 ax_scatter.scatter(x_case, y_case, s=50, c="w", alpha=1, marker=".")
 ax_scatter.scatter(x_case, y_case, s=30, c="darkorange", alpha=1, marker=".")
 cax = inset_axes(ax_scatter, width="40%", height="3%", loc="lower left", borderpad=2)
-fig.colorbar(pcm, cax=cax, orientation="horizontal")
+cbar = fig.colorbar(pcm, cax=cax, orientation="horizontal")
+cbar.ax.xaxis.set_major_locator(MultipleLocator(100))
+cbar.ax.tick_params(axis="x", labelsize=12)
 
 alpha = 0.4
 ax_histx.hist(x_main, bins=hist2d_bins, density=True, alpha=alpha, color="k")
@@ -406,17 +408,23 @@ if kde_on:
 ax_histx.tick_params(labelbottom=False)
 ax_histy.tick_params(labelleft=False)
 
-ax_histx.xaxis.set_major_locator(MultipleLocator(0.1))
+ax_histx.xaxis.set_major_locator(MultipleLocator(0.2))
+ax_histx.xaxis.set_minor_locator(MultipleLocator(0.1))
 ax_histx.yaxis.set_major_locator(MultipleLocator(2))
 ax_histy.xaxis.set_major_locator(MultipleLocator(2))
-ax_histy.yaxis.set_major_locator(MultipleLocator(0.1))
+ax_histy.yaxis.set_major_locator(MultipleLocator(0.2))
+ax_histy.yaxis.set_minor_locator(MultipleLocator(0.1))
 
-ax_histx.grid(True, linestyle=":", color="k", alpha=0.5)
-ax_histy.grid(True, linestyle=":", color="k", alpha=0.5)
+ax_histx.grid(True, which="both", linestyle=":", color="k", alpha=0.5)
+ax_histy.grid(True, which="both", linestyle=":", color="k", alpha=0.5)
 
 ax_scatter.set_xlabel(r"$u$-component (m.s$^{-1}$)", fontsize=FONTSIZE, labelpad=12)
 ax_scatter.set_ylabel(r"$v$-component (m.s$^{-1}$)", fontsize=FONTSIZE, labelpad=10)
-ax_scatter.grid(True, alpha=0.5, color="k", linewidth=0.5, linestyle=":")
+ax_scatter.xaxis.set_major_locator(MultipleLocator(0.2))
+ax_scatter.xaxis.set_minor_locator(MultipleLocator(0.1))
+ax_scatter.yaxis.set_major_locator(MultipleLocator(0.2))
+ax_scatter.yaxis.set_minor_locator(MultipleLocator(0.1))
+ax_scatter.grid(True, which="both", alpha=0.5, color="k", linewidth=0.5, linestyle=":")
 ax_scatter.axhline(0, color="k", linewidth=1)
 ax_scatter.axvline(0, color="k", linewidth=1)
 ax_scatter.set_xlim([-0.5, 0.5])
@@ -533,7 +541,7 @@ ax_tb19v.tick_params(axis="y", labelleft=False)
 ax_tb37v.tick_params(axis="y", labelleft=False)
 
 ax_tb_shared.set_xlabel("Brightness Tempearture (k)", fontsize=FONTSIZE, labelpad=10)
-ax_tb_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=15)
+ax_tb_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=26)
 
 sic_alpha = 0.4
 sic_bins = np.arange(0, 100.5, 1.0)
@@ -558,7 +566,7 @@ for ax_sic, main_vals, case_t0_vals, case_t1_vals, color, base_label in [
 
 ax_sic_bs.tick_params(axis="x", labelbottom=False)
 ax_sic_shared.set_xlabel("SIC (%)", fontsize=FONTSIZE, labelpad=10)
-ax_sic_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=21)
+ax_sic_shared.set_ylabel("Probability density", fontsize=FONTSIZE, labelpad=26)
 
 subplot_labels = [
     (ax_tb19h,     "(a)", 0.04, 0.96),
@@ -595,6 +603,6 @@ for ax in [ax_tb19h, ax_tb19v, ax_tb37h, ax_tb37v, ax_sic_bs, ax_sic_ecice, ax_d
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE_TICKLABELS)
 
 
-plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure07_v002.png', dpi=500, bbox_inches='tight')
+plt.savefig('/home/waynedj/Projects/swath_based_framework/figures/publication/Figure07_v003.png', dpi=500, bbox_inches='tight')
 plt.close()
 # %%
