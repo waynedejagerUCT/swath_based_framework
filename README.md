@@ -6,6 +6,8 @@ This repository contains Python scripts and supporting datasets used in the manu
 
 **“Dynamic Decomposition of Sub-Daily Antarctic Sea-Ice Concentration Variability using Passive Microwave Swath Observations.”**
 
+https://doi.org/10.1029/2025EA004687
+
 The framework performs two primary tasks:
 
 1. **Sea-ice concentration retrieval** using the ECICE Ice Type algorithm applied to AMSR2 brightness temperature observations (19H, 19V, 37H, 37V).
