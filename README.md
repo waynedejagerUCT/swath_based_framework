@@ -4,9 +4,7 @@
 
 This repository contains Python scripts and supporting datasets used in the manuscript:
 
-**“Dynamic Decomposition of Sub-Daily Antarctic Sea-Ice Concentration Variability using Passive Microwave Swath Observations.”**
-
-https://doi.org/10.1029/2025EA004687
+de Jager, W., Melsheimer, C., Spreen, G., & Vichi, M. (2026). Dynamic decomposition of sub-daily Antarctic sea-ice concentration change using passive microwave swath observations. Earth and Space Science, 13, e2025EA004687. https://doi.org/10.1029/2025EA004687
 
 The framework performs two primary tasks:
 
